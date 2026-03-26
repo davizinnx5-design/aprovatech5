@@ -1,0 +1,1855 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aprova Tech</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { box-sizing: border-box; }
+    .sidebar-item { transition: all 0.2s ease; }
+    .sidebar-item:hover { background: rgba(255,255,255,0.1); padding-left: 1.25rem; }
+    .sidebar-item.active { background: rgba(255,255,255,0.15); border-left: 4px solid #fbbf24; padding-left: 1rem; }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.12); }
+    .progress-ring { transition: stroke-dashoffset 0.5s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    .animate-fade { animation: fadeIn 0.3s ease-out; }
+    .animate-slide { animation: slideInLeft 0.4s ease-out; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+    .chart-bar { transition: all 0.3s ease; cursor: pointer; }
+    .chart-bar:hover { filter: brightness(1.15); }
+    .tooltip { position: absolute; background: #1f2937; color: white; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; pointer-events: none; z-index: 100; white-space: nowrap; }
+    .legend-item { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
+    .legend-item:hover { background: rgba(0,0,0,0.05); }
+    .filter-btn { transition: all 0.2s ease; }
+    .filter-btn.active { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  </style>
+  
+  
+ </head>
+ <body class="h-full bg-slate-50">
+  <div id="app" class="h-full w-full"></div>
+  <script>
+    // ==================== LOCAL STORAGE DATA ====================
+    const db = {
+      users: [],
+      studyLogs: [],
+      essays: [],
+      simulados: []
+    };
+
+    // Load data from localStorage on startup
+    function loadData() {
+      try {
+        const saved = localStorage.getItem('aprovaTechData');
+        if (saved) {
+          const loaded = JSON.parse(saved);
+          Object.assign(db, loaded);
+        }
+      } catch (e) {
+        console.error('Erro ao carregar dados:', e);
+      }
+    }
+
+    // Save data to localStorage
+    function saveData() {
+      try {
+        localStorage.setItem('aprovaTechData', JSON.stringify(db));
+      } catch (e) {
+        console.error('Erro ao salvar dados:', e);
+      }
+    }
+
+    // ==================== STATE ====================
+    let currentUser = null;
+    let currentView = 'dashboard';
+    let simuladoTimer = null;
+    let simuladoTimeLeft = 0;
+    let currentSimuladoAnswers = {};
+
+    // ==================== REFERENCE DATA ====================
+    const subjects = [
+      { id: 'mat', name: 'Matemática', icon: '📐', color: '#3b82f6', topics: ['Álgebra', 'Geometria', 'Funções', 'Estatística', 'Trigonometria'] },
+      { id: 'por', name: 'Português', icon: '📚', color: '#8b5cf6', topics: ['Gramática', 'Interpretação', 'Literatura', 'Redação'] },
+      { id: 'his', name: 'História', icon: '🏛️', color: '#f59e0b', topics: ['Brasil Colônia', 'Brasil Império', 'República', 'História Geral'] },
+      { id: 'geo', name: 'Geografia', icon: '🌍', color: '#10b981', topics: ['Física', 'Humana', 'Brasil', 'Cartografia'] },
+      { id: 'fis', name: 'Física', icon: '⚡', color: '#ef4444', topics: ['Mecânica', 'Termologia', 'Óptica', 'Eletricidade'] },
+      { id: 'qui', name: 'Química', icon: '🧪', color: '#06b6d4', topics: ['Orgânica', 'Inorgânica', 'Físico-Química'] },
+      { id: 'bio', name: 'Biologia', icon: '🧬', color: '#84cc16', topics: ['Citologia', 'Genética', 'Ecologia', 'Evolução'] },
+      { id: 'fil', name: 'Filosofia', icon: '🤔', color: '#a855f7', topics: ['Ética', 'Política', 'Epistemologia'] },
+      { id: 'soc', name: 'Sociologia', icon: '👥', color: '#ec4899', topics: ['Clássicos', 'Contemporânea', 'Brasil'] }
+    ];
+
+    // Study Materials and Notes
+    const studyMaterials = [
+      { id: 1, subject: 'mat', title: 'Álgebra Linear - Matrizes', description: 'Conceitos básicos de matrizes e determinantes', difficulty: 'intermediário' },
+      { id: 2, subject: 'por', title: 'Figuras de Linguagem', description: 'Metáfora, metonímia, hipérbole e outras', difficulty: 'fácil' },
+      { id: 3, subject: 'his', title: 'Revolução Francesa', description: 'Causas, consequências e principais eventos', difficulty: 'intermediário' },
+      { id: 4, subject: 'fis', title: 'Leis de Newton', description: 'Primeira, segunda e terceira lei do movimento', difficulty: 'intermediário' },
+      { id: 5, subject: 'qui', title: 'Tabela Periódica', description: 'Organização, grupos e períodos', difficulty: 'fácil' }
+    ];
+
+    const essayThemes = [
+      { year: 2023, theme: 'Desafios para o enfrentamento da invisibilidade do trabalho de cuidado realizado pela mulher no Brasil' },
+      { year: 2022, theme: 'Desafios para a valorização de comunidades e povos tradicionais no Brasil' },
+      { year: 2021, theme: 'Invisibilidade e registro civil: garantia de acesso à cidadania no Brasil' },
+      { year: 2020, theme: 'O estigma associado às doenças mentais na sociedade brasileira' },
+      { year: 2019, theme: 'Democratização do acesso ao cinema no Brasil' }
+    ];
+
+    const simuladoQuestions = {
+      mat: [
+        { q: 'Qual é o valor de x na equação 2x + 5 = 15?', options: ['3', '4', '5', '6', '7'], correct: 2 },
+        { q: 'A área de um quadrado de lado 4cm é:', options: ['8cm²', '12cm²', '16cm²', '20cm²', '24cm²'], correct: 2 },
+        { q: 'Quanto é 15% de 200?', options: ['20', '25', '30', '35', '40'], correct: 2 },
+        { q: 'Se f(x) = 2x + 3, qual é f(4)?', options: ['8', '9', '10', '11', '12'], correct: 3 },
+        { q: 'Qual é o MMC de 4 e 6?', options: ['8', '10', '12', '14', '24'], correct: 2 }
+      ],
+      por: [
+        { q: 'Qual figura de linguagem está presente em "O sol sorriu para nós"?', options: ['Metáfora', 'Prosopopeia', 'Hipérbole', 'Metonímia', 'Antítese'], correct: 1 },
+        { q: 'Identifique a oração subordinada: "Espero que você venha"', options: ['Substantiva objetiva direta', 'Adjetiva', 'Adverbial', 'Coordenada', 'Principal'], correct: 0 },
+        { q: 'Qual palavra está corretamente grafada?', options: ['Excessão', 'Exceção', 'Excesão', 'Exseção', 'Excepção'], correct: 1 },
+        { q: '"Os lusíadas" pertence a qual escola literária?', options: ['Barroco', 'Arcadismo', 'Classicismo', 'Romantismo', 'Realismo'], correct: 2 },
+        { q: 'Qual é o plural de "cidadão"?', options: ['Cidadãos', 'Cidadões', 'Cidadães', 'Cidadãs', 'Cidadãoes'], correct: 0 }
+      ],
+      his: [
+        { q: 'Quem proclamou a independência do Brasil?', options: ['Tiradentes', 'D. João VI', 'D. Pedro I', 'José Bonifácio', 'Deodoro'], correct: 2 },
+        { q: 'A Revolução Francesa ocorreu em que ano?', options: ['1776', '1789', '1799', '1815', '1848'], correct: 1 },
+        { q: 'Qual foi o primeiro presidente do Brasil?', options: ['Getúlio Vargas', 'Prudente de Morais', 'Deodoro da Fonseca', 'Floriano Peixoto', 'Campos Sales'], correct: 2 },
+        { q: 'A Era Vargas durou de:', options: ['1920-1940', '1930-1945', '1935-1950', '1940-1955', '1925-1940'], correct: 1 },
+        { q: 'O Tratado de Tordesilhas foi assinado em:', options: ['1492', '1494', '1500', '1502', '1510'], correct: 1 }
+      ]
+    };
+
+    // ==================== HELPER FUNCTIONS ====================
+    function formatTime(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function getTodayStudyHours() {
+      const today = new Date().toISOString().split('T')[0];
+      return db.studyLogs
+        .filter(log => log.email === currentUser.email && log.studyDate === today)
+        .reduce((sum, log) => sum + (log.studyHours || 0), 0);
+    }
+
+    function getWeekStudyHours() {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      return db.studyLogs
+        .filter(log => log.email === currentUser.email && new Date(log.studyDate) >= oneWeekAgo)
+        .reduce((sum, log) => sum + (log.studyHours || 0), 0);
+    }
+
+    // ==================== RENDER MAIN APP ====================
+    function renderApp() {
+      const app = document.getElementById('app');
+
+      if (!currentUser) {
+        if (currentView === 'register') {
+          renderRegister(app);
+        } else {
+          renderLogin(app);
+        }
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="flex h-full w-full">
+          <!-- Sidebar -->
+          <aside class="w-64 bg-gradient-to-b from-slate-800 to-slate-900 text-white flex flex-col flex-shrink-0">
+            <div class="p-6 border-b border-slate-700 flex flex-col items-center gap-3">
+              <img src="https://i.postimg.cc/B65S5LHK/background-removal-TUFIRU9t-Qk-RTYU0j-MSM2Y2Fm-Mjhh-NTNh-Mz-Ri-Yz-Bi-NTFl-MTQ3ZGQx-Nm-Ey-ZTRm-MCMy-M.png" alt="Aprova Tech Logo" width="128" height="128" loading="lazy" onerror="console.error('Logo failed to load:', this.src); this.style.display='none';" style="border-radius: 12px; object-fit: contain;">
+              <h1 class="text-3xl font-bold text-white text-center">Aprova Tech</h1>
+            </div>
+            
+            <nav class="flex-1 py-4 overflow-auto scrollbar-thin">
+              <div class="px-3 mb-2 text-xs uppercase text-slate-400 font-semibold">Menu</div>
+              ${renderNavItem('dashboard', 'Dashboard')}
+              ${renderNavItem('schedule', 'Cronograma')}
+              ${renderNavItem('performance', 'Desempenho')}
+              ${renderNavItem('subjects', 'Matérias')}
+              ${renderNavItem('materials', 'Materiais')}
+              ${renderNavItem('tasks', 'Tarefas')}
+              ${renderNavItem('flashcards', 'Flashcards')}
+              ${renderNavItem('simulados', 'Simulados')}
+              ${renderNavItem('essays', 'Redação')}
+              ${renderNavItem('settings', 'Configurações')}
+            </nav>
+            
+            <div class="p-4 border-t border-slate-700">
+              <button onclick="logout()" class="w-full py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition">
+                Sair
+              </button>
+            </div>
+          </aside>
+          
+          <!-- Main Content -->
+          <main class="flex-1 overflow-auto bg-slate-50 scrollbar-thin" id="main-content">
+            <!-- Content rendered here -->
+          </main>
+        </div>
+      `;
+
+      renderCurrentView();
+    }
+
+    function renderNavItem(view, label) {
+      const isActive = currentView === view;
+      return `
+        <button onclick="navigate('${view}')" 
+                class="sidebar-item w-full flex items-center gap-3 px-4 py-3 text-left transition ${isActive ? 'active' : ''}">
+          <span class="font-medium">${label}</span>
+        </button>
+      `;
+    }
+
+    function renderCurrentView() {
+      const main = document.getElementById('main-content');
+      if (!main) return;
+
+      const views = {
+        dashboard: renderDashboard,
+        schedule: renderSchedule,
+        performance: renderPerformance,
+        subjects: renderSubjects,
+        materials: renderMaterials,
+        tasks: renderTasks,
+        flashcards: renderFlashcards,
+        simulados: renderSimulados,
+        essays: renderEssays,
+        settings: renderSettings
+      };
+
+      const renderFn = views[currentView] || renderDashboard;
+      main.innerHTML = renderFn();
+
+      setTimeout(() => {
+        if (window.lucide) {
+          lucide.createIcons();
+        }
+      }, 0);
+    }
+
+    function navigate(view) {
+      if (simuladoTimer) {
+        clearInterval(simuladoTimer);
+        simuladoTimer = null;
+      }
+      currentView = view;
+      renderCurrentView();
+    }
+
+    // ==================== LOGIN/REGISTER ====================
+    function renderLogin(container) {
+      container.innerHTML = `
+        <div class="h-full w-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 p-4">
+          <div class="w-full max-w-md">
+            <div class="text-center mb-8">
+              <div class="flex items-center justify-center gap-3 mb-4">
+                <img src="https://i.postimg.cc/B65S5LHK/background-removal-TUFIRU9t-Qk-RTYU0j-MSM2Y2Fm-Mjhh-NTNh-Mz-Ri-Yz-Bi-NTFl-MTQ3ZGQx-Nm-Ey-ZTRm-MCMy-M.png" alt="Aprova Tech Logo" width="96" height="96" loading="lazy" onerror="console.error('Logo failed to load:', this.src); this.style.display='none';" style="border-radius: 10px; object-fit: contain;">
+                <h1 class="text-5xl font-bold text-white">Aprova Tech</h1>
+              </div>
+              <p class="text-slate-400">Seu guia de estudos para o ENEM</p>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-2xl p-8">
+              <h2 class="text-2xl font-bold text-slate-800 mb-6">Entrar</h2>
+              
+              <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-slate-700 mb-2">E-mail</label>
+                  <input type="email" id="login-email" required
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500"
+                         placeholder="seu@email.com">
+                </div>
+                
+                <div class="mb-6">
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Senha</label>
+                  <input type="password" id="login-password" required
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500"
+                         placeholder="••••••••">
+                </div>
+                
+                <button type="submit"
+                        class="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition">
+                  Entrar
+                </button>
+              </form>
+              
+              <div id="login-error" class="hidden mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm"></div>
+              
+              <p class="mt-6 text-center text-slate-600">
+                Não tem conta? 
+                <button onclick="showRegister()" class="text-amber-600 font-semibold hover:underline">Cadastre-se</button>
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRegister(container) {
+      container.innerHTML = `
+        <div class="h-full w-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 p-4">
+          <div class="w-full max-w-md">
+            <div class="text-center mb-8">
+              <div class="flex items-center justify-center gap-3 mb-4">
+                <img src="https://i.postimg.cc/B65S5LHK/background-removal-TUFIRU9t-Qk-RTYU0j-MSM2Y2Fm-Mjhh-NTNh-Mz-Ri-Yz-Bi-NTFl-MTQ3ZGQx-Nm-Ey-ZTRm-MCMy-M.png" alt="Aprova Tech Logo" width="96" height="96" loading="lazy" onerror="console.error('Logo failed to load:', this.src); this.style.display='none';" style="border-radius: 10px; object-fit: contain;">
+                <h1 class="text-5xl font-bold text-white">Aprova Tech</h1>
+              </div>
+              <p class="text-slate-400">Crie sua conta gratuita</p>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-2xl p-8">
+              <h2 class="text-2xl font-bold text-slate-800 mb-6">Cadastrar</h2>
+              
+              <form id="register-form" onsubmit="handleRegister(event)">
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Nome</label>
+                  <input type="text" id="register-name" required
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500"
+                         placeholder="Seu nome">
+                </div>
+                
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-slate-700 mb-2">E-mail</label>
+                  <input type="email" id="register-email" required
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500"
+                         placeholder="seu@email.com">
+                </div>
+                
+                <div class="mb-6">
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Senha</label>
+                  <input type="password" id="register-password" required minlength="6"
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500"
+                         placeholder="Mínimo 6 caracteres">
+                </div>
+                
+                <button type="submit"
+                        class="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition">
+                  Criar conta
+                </button>
+              </form>
+              
+              <div id="register-error" class="hidden mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm"></div>
+              
+              <p class="mt-6 text-center text-slate-600">
+                Já tem conta? 
+                <button onclick="showLogin()" class="text-amber-600 font-semibold hover:underline">Entrar</button>
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function showRegister() {
+      currentView = 'register';
+      renderApp();
+    }
+
+    function showLogin() {
+      currentView = 'login';
+      renderApp();
+    }
+
+    function handleRegister(e) {
+      e.preventDefault();
+      const errorEl = document.getElementById('register-error');
+      
+      const name = document.getElementById('register-name').value.trim();
+      const email = document.getElementById('register-email').value.trim().toLowerCase();
+      const password = document.getElementById('register-password').value;
+
+      if (db.users.find(u => u.email === email)) {
+        errorEl.textContent = 'Este e-mail já está cadastrado.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      db.users.push({ name, email, password });
+      saveData();
+
+      currentUser = { email, name };
+      currentView = 'dashboard';
+      renderApp();
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const errorEl = document.getElementById('login-error');
+      
+      const email = document.getElementById('login-email').value.trim().toLowerCase();
+      const password = document.getElementById('login-password').value;
+
+      const user = db.users.find(u => u.email === email && u.password === password);
+      
+      if (user) {
+        currentUser = { email: user.email, name: user.name };
+        currentView = 'dashboard';
+        renderApp();
+      } else {
+        errorEl.textContent = 'E-mail ou senha incorretos.';
+        errorEl.classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      currentView = 'login';
+      renderApp();
+    }
+
+    // ==================== DASHBOARD ====================
+    function renderDashboard() {
+      const todayHours = getTodayStudyHours();
+      const weekHours = getWeekStudyHours();
+      const dailyGoal = 4;
+      const todayPercent = Math.min((todayHours / dailyGoal) * 100, 100);
+      const essayCount = db.essays.filter(e => e.email === currentUser.email).length;
+      const simuladoCount = db.simulados.filter(s => s.email === currentUser.email).length;
+
+      return `
+        <div class="p-6 lg:p-8">
+          <div class="mb-8 flex items-center gap-6">
+            <img src="https://i.postimg.cc/B65S5LHK/background-removal-TUFIRU9t-Qk-RTYU0j-MSM2Y2Zm-Mjhh-NTNh-Mz-Ri-Yz-Bi-NTFl-MTQ3ZGQx-Nm-Ey-ZTRm-MCMy-M.png" alt="Aprova Tech Logo" width="160" height="160" loading="lazy" onerror="console.error('Logo failed to load:', this.src); this.style.display='none';" style="border-radius: 12px; object-fit: contain;">
+            <div>
+              <h1 class="text-4xl font-bold text-slate-800">Olá, ${currentUser.name?.split(' ')[0]}! 👋</h1>
+              <p class="text-slate-500 mt-2 text-lg">Vamos continuar sua jornada de estudos?</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <div class="flex items-center justify-between mb-4">
+                <span class="text-3xl">⏱️</span>
+              </div>
+              <h3 class="text-3xl font-bold text-slate-800">${todayHours.toFixed(1)}h</h3>
+              <p class="text-slate-500 text-sm">Horas estudadas hoje</p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <span class="text-3xl">📊</span>
+              <h3 class="text-3xl font-bold text-slate-800">${weekHours.toFixed(1)}h</h3>
+              <p class="text-slate-500 text-sm">Horas na semana</p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <span class="text-3xl">✍️</span>
+              <h3 class="text-3xl font-bold text-slate-800">${essayCount}</h3>
+              <p class="text-slate-500 text-sm">Redações escritas</p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <span class="text-3xl">📝</span>
+              <h3 class="text-3xl font-bold text-slate-800">${simuladoCount}</h3>
+              <p class="text-slate-500 text-sm">Simulados feitos</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white">
+              <h3 class="text-xl font-bold mb-2">🚀 Começar Agora</h3>
+              <p class="opacity-90 mb-4">Registre suas horas de estudo!</p>
+              <button onclick="navigate('schedule')" class="px-6 py-2 bg-white text-amber-600 font-semibold rounded-xl hover:bg-amber-50 transition">
+                Estudar
+              </button>
+            </div>
+
+            <div class="bg-gradient-to-br from-purple-500 to-indigo-500 rounded-2xl p-6 text-white">
+              <h3 class="text-xl font-bold mb-2">✍️ Praticar Redação</h3>
+              <p class="opacity-90 mb-4">Redação vale 1000 pontos!</p>
+              <button onclick="navigate('essays')" class="px-6 py-2 bg-white text-purple-600 font-semibold rounded-xl hover:bg-purple-50 transition">
+                Escrever
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==================== SCHEDULE ====================
+    function renderSchedule() {
+      const studyLogs = db.studyLogs.filter(s => s.email === currentUser.email).sort((a, b) => new Date(b.studyDate) - new Date(a.studyDate));
+      const todayHours = getTodayStudyHours();
+
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">Cronograma de Estudos</h1>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Registrar Estudo</h3>
+            <form id="study-form" onsubmit="handleAddStudy(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Data</label>
+                <input type="date" id="study-date" value="${new Date().toISOString().split('T')[0]}" required
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Matéria</label>
+                <select id="study-subject" required class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                  ${subjects.map(s => `<option value="${s.id}">${s.icon} ${s.name}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Horas</label>
+                <input type="number" id="study-hours" min="0.5" max="12" step="0.5" required placeholder="Ex: 2"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+              </div>
+              <div class="flex items-end">
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition">
+                  Adicionar
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Histórico</h3>
+            ${studyLogs.length === 0 ? `
+              <p class="text-slate-500 text-center py-8">Nenhum estudo registrado</p>
+            ` : `
+              <div class="space-y-3">
+                ${studyLogs.map(log => {
+                  const subj = subjects.find(s => s.id === log.subject);
+                  return `
+                    <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+                      <span class="text-2xl">${subj?.icon || '📚'}</span>
+                      <div class="flex-1">
+                        <h4 class="font-semibold text-slate-800">${subj?.name || 'Estudo'}</h4>
+                        <p class="text-sm text-slate-500">${new Date(log.studyDate).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <span class="text-lg font-bold text-amber-600">${log.studyHours}h</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function handleAddStudy(e) {
+      e.preventDefault();
+      
+      db.studyLogs.push({
+        email: currentUser.email,
+        studyDate: document.getElementById('study-date').value,
+        subject: document.getElementById('study-subject').value,
+        studyHours: parseFloat(document.getElementById('study-hours').value),
+        createdAt: new Date().toISOString()
+      });
+
+      saveData();
+      document.getElementById('study-form').reset();
+      renderCurrentView();
+    }
+
+    // ==================== PERFORMANCE ====================
+    function renderPerformance() {
+      const weekHours = getWeekStudyHours();
+      const simulados = db.simulados.filter(s => s.email === currentUser.email);
+      const essays = db.essays.filter(e => e.email === currentUser.email);
+
+      // Dados detalhados dos simulados
+      const recentSimulados = simulados.slice(-20).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const chartData = recentSimulados.map(s => ({
+        date: new Date(s.createdAt).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }),
+        fullDate: new Date(s.createdAt),
+        score: (s.score / s.totalQuestions) * 100,
+        subject: subjects.find(subj => subj.id === s.subject)?.name || 'Teste',
+        subjectId: s.subject,
+        correct: s.score,
+        total: s.totalQuestions,
+        color: subjects.find(subj => subj.id === s.subject)?.color || '#6b7280'
+      }));
+
+      // Calcular estatísticas
+      const avgScore = chartData.length > 0 
+        ? chartData.reduce((sum, s) => sum + s.score, 0) / chartData.length 
+        : 0;
+      
+      const bestScore = chartData.length > 0 ? Math.max(...chartData.map(d => d.score)) : 0;
+      const worstScore = chartData.length > 0 ? Math.min(...chartData.map(d => d.score)) : 0;
+
+      // Desempenho por matéria
+      const performanceBySubject = {};
+      chartData.forEach(data => {
+        if (!performanceBySubject[data.subject]) {
+          performanceBySubject[data.subject] = { scores: [], color: data.color, id: data.subjectId };
+        }
+        performanceBySubject[data.subject].scores.push(data.score);
+      });
+
+      Object.keys(performanceBySubject).forEach(key => {
+        const scores = performanceBySubject[key].scores;
+        performanceBySubject[key].avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        performanceBySubject[key].trend = scores.length > 1 ? scores[scores.length - 1] - scores[0] : 0;
+      });
+
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">📊 Meu Desempenho</h1>
+
+          <!-- Cards de Resumo -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg card-hover">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="opacity-90 text-sm mb-1">Horas na Semana</p>
+                  <p class="text-4xl font-bold">${weekHours.toFixed(1)}h</p>
+                </div>
+                <span class="text-5xl opacity-30">⏱️</span>
+              </div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg card-hover">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="opacity-90 text-sm mb-1">Simulados</p>
+                  <p class="text-4xl font-bold">${simulados.length}</p>
+                </div>
+                <span class="text-5xl opacity-30">📝</span>
+              </div>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg card-hover">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="opacity-90 text-sm mb-1">Redações</p>
+                  <p class="text-4xl font-bold">${essays.length}</p>
+                </div>
+                <span class="text-5xl opacity-30">✍️</span>
+              </div>
+            </div>
+            <div class="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 text-white shadow-lg card-hover">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="opacity-90 text-sm mb-1">Média Geral</p>
+                  <p class="text-4xl font-bold">${avgScore.toFixed(1)}%</p>
+                </div>
+                <span class="text-5xl opacity-30">📈</span>
+              </div>
+            </div>
+          </div>
+
+          ${simulados.length > 0 ? `
+            <!-- Gráfico Interativo de Evolução -->
+            <div class="bg-white rounded-2xl p-8 shadow-lg mb-8">
+              <div class="flex items-center justify-between mb-6">
+                <div>
+                  <h2 class="text-2xl font-bold text-slate-800">📈 Evolução de Desempenho</h2>
+                  <p class="text-slate-500 text-sm mt-1">Últimos ${chartData.length} simulados</p>
+                </div>
+                <div class="text-right">
+                  <div class="inline-flex gap-2">
+                    <div class="text-center">
+                      <p class="text-xs text-slate-500">Melhor</p>
+                      <p class="text-2xl font-bold text-green-600">${bestScore.toFixed(0)}%</p>
+                    </div>
+                    <div class="w-px bg-slate-200"></div>
+                    <div class="text-center">
+                      <p class="text-xs text-slate-500">Pior</p>
+                      <p class="text-2xl font-bold text-red-600">${worstScore.toFixed(0)}%</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gráfico com Grid e Labels -->
+              <div style="width: 100%; position: relative; margin-bottom: 60px;">
+                <!-- Grid de fundo -->
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; pointer-events: none; opacity: 0.3;">
+                  ${[0, 1, 2, 3, 4].map(() => '<div style="flex: 1; border-bottom: 1px solid #e5e7eb;"></div>').join('')}
+                </div>
+
+                <!-- Labels do eixo Y -->
+                <div style="position: absolute; left: -50px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: space-between; font-size: 12px; color: #9ca3af; text-align: right; font-weight: 600;">
+                  <div>100%</div>
+                  <div>75%</div>
+                  <div>50%</div>
+                  <div>25%</div>
+                  <div>0%</div>
+                </div>
+
+                <!-- Container das barras -->
+                <div id="performance-chart" style="width: 100%; height: 380px; position: relative; display: flex; align-items: flex-end; justify-content: space-around; gap: 8px; padding: 0 20px; margin-left: 50px;">
+                  ${chartData.map((data, i) => {
+                    const heightPercent = Math.max(data.score, 2);
+                    return `
+                      <div class="chart-item" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 30px; position: relative;" 
+                           onmouseover="showChartTooltip(this, ${data.score.toFixed(1)}, '${data.subject}', '${data.correct}/${data.total}')" 
+                           onmouseout="hideChartTooltip()">
+                        
+                        <!-- Barra com animação -->
+                        <div class="chart-bar" style="width: 100%; height: ${heightPercent * 3}px; background: linear-gradient(135deg, ${data.color}, ${data.color}dd); border-radius: 8px 8px 0 0; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; overflow: hidden;">
+                          <div style="position: absolute; inset: 0; opacity: 0; background: rgba(255,255,255,0.2); border-radius: 8px 8px 0 0; transition: opacity 0.3s ease;" class="bar-overlay"></div>
+                        </div>
+
+                        <!-- Info abaixo -->
+                        <div style="text-align: center; width: 100%; margin-top: 12px;">
+                          <div style="font-size: 11px; font-weight: 700; color: #1f2937;">${data.score.toFixed(0)}%</div>
+                          <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">${data.date}</div>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+
+                <!-- Legenda X -->
+                <div style="position: absolute; bottom: -40px; left: 50px; right: 0; text-align: center; font-size: 11px; color: #6b7280;">
+                  <p><strong>${chartData.length}</strong> simulados registrados</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Desempenho por Matéria -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <!-- Ranking de Matérias -->
+              <div class="bg-white rounded-2xl p-6 shadow-lg">
+                <h3 class="text-xl font-bold text-slate-800 mb-6">🎯 Desempenho por Matéria</h3>
+                <div class="space-y-4">
+                  ${Object.entries(performanceBySubject)
+                    .sort((a, b) => b[1].avg - a[1].avg)
+                    .map(([subject, data], index) => {
+                      const trendIcon = data.trend > 0 ? '📈' : data.trend < 0 ? '📉' : '➡️';
+                      return `
+                        <div class="p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition">
+                          <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-3">
+                              <span style="font-size: 20px;">${subjects.find(s => s.name === subject)?.icon || '📚'}</span>
+                              <div>
+                                <h4 class="font-semibold text-slate-800">${subject}</h4>
+                                <p class="text-xs text-slate-500">${data.scores.length} simulado(s)</p>
+                              </div>
+                            </div>
+                            <div class="text-right">
+                              <p class="text-lg font-bold" style="color: ${data.color}">${data.avg.toFixed(0)}%</p>
+                              <p class="text-xs font-medium ${data.trend > 0 ? 'text-green-600' : data.trend < 0 ? 'text-red-600' : 'text-slate-500'}">
+                                ${trendIcon} ${Math.abs(data.trend).toFixed(1)}%
+                              </p>
+                            </div>
+                          </div>
+                          <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all" style="width: ${data.avg}%; background: ${data.color}"></div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                </div>
+              </div>
+
+              <!-- Estatísticas Detalhadas -->
+              <div class="bg-white rounded-2xl p-6 shadow-lg">
+                <h3 class="text-xl font-bold text-slate-800 mb-6">📊 Estatísticas Detalhadas</h3>
+                <div class="space-y-4">
+                  <div class="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                    <p class="text-sm text-slate-600 mb-1">Melhor Desempenho</p>
+                    <p class="text-3xl font-bold text-green-600">${bestScore.toFixed(0)}%</p>
+                  </div>
+                  <div class="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                    <p class="text-sm text-slate-600 mb-1">Média Geral</p>
+                    <p class="text-3xl font-bold text-amber-600">${avgScore.toFixed(0)}%</p>
+                  </div>
+                  <div class="p-4 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200">
+                    <p class="text-sm text-slate-600 mb-1">Pior Desempenho</p>
+                    <p class="text-3xl font-bold text-red-600">${worstScore.toFixed(0)}%</p>
+                  </div>
+                  <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                    <p class="text-sm text-slate-600 mb-1">Variação</p>
+                    <p class="text-3xl font-bold text-blue-600">${(bestScore - worstScore).toFixed(0)}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Histórico Detalhado -->
+            <div class="bg-white rounded-2xl p-6 shadow-lg">
+              <h3 class="text-xl font-bold text-slate-800 mb-6">📋 Histórico Detalhado</h3>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                    <tr class="border-b-2 border-slate-200">
+                      <th class="text-left py-3 px-4 font-semibold text-slate-700">Data</th>
+                      <th class="text-left py-3 px-4 font-semibold text-slate-700">Matéria</th>
+                      <th class="text-center py-3 px-4 font-semibold text-slate-700">Acertos</th>
+                      <th class="text-right py-3 px-4 font-semibold text-slate-700">Desempenho</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${recentSimulados.map(data => {
+                      const percent = (data.score / data.totalQuestions) * 100;
+                      const statusColor = percent >= 70 ? 'green' : percent >= 50 ? 'amber' : 'red';
+                      return `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+                          <td class="py-3 px-4 text-slate-700">${new Date(data.createdAt).toLocaleDateString('pt-BR')}</td>
+                          <td class="py-3 px-4">
+                            <span style="display: inline-flex; align-items: center; gap: 8px;">
+                              <span style="font-size: 18px;">${subjects.find(s => s.id === data.subject)?.icon}</span>
+                              <span class="font-medium text-slate-800">${subjects.find(s => s.id === data.subject)?.name}</span>
+                            </span>
+                          </td>
+                          <td class="py-3 px-4 text-center">
+                            <span class="px-3 py-1 bg-slate-100 text-slate-800 font-semibold rounded-lg">${data.score}/${data.totalQuestions}</span>
+                          </td>
+                          <td class="py-3 px-4 text-right">
+                            <span class="text-lg font-bold" style="color: ${statusColor === 'green' ? '#16a34a' : statusColor === 'amber' ? '#d97706' : '#dc2626'}">
+                              ${percent.toFixed(0)}%
+                            </span>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ` : `
+            <div class="bg-white rounded-2xl p-12 shadow-lg text-center">
+              <div class="text-6xl mb-4">📚</div>
+              <h3 class="text-2xl font-bold text-slate-800 mb-2">Comece a fazer simulados!</h3>
+              <p class="text-slate-600 mb-6">Seu desempenho aparecerá aqui quando você completar os primeiros simulados.</p>
+              <button onclick="navigate('simulados')" class="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition">
+                Começar Simulado
+              </button>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function showChartTooltip(element, score, subject, answers) {
+      const bar = element.querySelector('.chart-bar');
+      if (bar) {
+        bar.style.transform = 'scaleY(1.1)';
+        bar.style.filter = 'brightness(1.2)';
+        bar.querySelector('.bar-overlay').style.opacity = '1';
+      }
+      
+      const tooltip = document.createElement('div');
+      tooltip.className = 'tooltip';
+      tooltip.style.bottom = element.querySelector('.chart-bar').offsetHeight + 50 + 'px';
+      tooltip.style.left = '50%';
+      tooltip.style.transform = 'translateX(-50%)';
+      tooltip.innerHTML = `<strong>${subject}</strong><br>${score}% • ${answers}`;
+      element.appendChild(tooltip);
+    }
+
+    function hideChartTooltip() {
+      const bars = document.querySelectorAll('.chart-bar');
+      bars.forEach(bar => {
+        bar.style.transform = 'scaleY(1)';
+        bar.style.filter = 'brightness(1)';
+        const overlay = bar.querySelector('.bar-overlay');
+        if (overlay) overlay.style.opacity = '0';
+      });
+      
+      const tooltips = document.querySelectorAll('.tooltip');
+      tooltips.forEach(t => t.remove());
+    }
+
+    // ==================== SUBJECTS ====================
+    function renderSubjects() {
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">Áreas de Estudo</h1>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            ${subjects.map(subj => `
+              <div class="bg-white rounded-2xl p-6 shadow-sm cursor-pointer hover:shadow-lg transition" onclick="navigate('simulados')">
+                <div class="flex items-center gap-4 mb-4">
+                  <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl" style="background: ${subj.color}20">
+                    ${subj.icon}
+                  </div>
+                  <h3 class="text-xl font-bold text-slate-800">${subj.name}</h3>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  ${subj.topics.slice(0, 2).map(t => `
+                    <span class="px-3 py-1 text-xs font-medium rounded-full" style="background: ${subj.color}15; color: ${subj.color}">${t}</span>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // ==================== STUDY MATERIALS ====================
+    function renderMaterials() {
+      const userMaterials = db.materials || [];
+
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">📚 Materiais de Estudo</h1>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Adicionar Material</h3>
+            <form id="material-form" onsubmit="handleAddMaterial(event)">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Título</label>
+                  <input type="text" id="material-title" required placeholder="Ex: Fotossíntese"
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Matéria</label>
+                  <select id="material-subject" required class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                    ${subjects.map(s => `<option value="${s.id}">${s.icon} ${s.name}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Descrição</label>
+                <textarea id="material-description" required rows="4" placeholder="Resumo ou descrição do material..."
+                          class="w-full px-4 py-3 border border-slate-200 rounded-xl resize-none"></textarea>
+              </div>
+              <button type="submit" class="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition">
+                ➕ Adicionar Material
+              </button>
+            </form>
+          </div>
+
+          <div class="space-y-4">
+            ${studyMaterials.concat(userMaterials).length === 0 ? `
+              <div class="text-center py-12">
+                <p class="text-slate-500">Nenhum material disponível</p>
+              </div>
+            ` : `
+              ${studyMaterials.concat(userMaterials).map(material => {
+                const subj = subjects.find(s => s.id === material.subject);
+                return `
+                  <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                          <span class="text-2xl">${subj?.icon}</span>
+                          <h4 class="text-lg font-bold text-slate-800">${material.title}</h4>
+                          <span class="px-2 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-600">${subj?.name}</span>
+                        </div>
+                        <p class="text-slate-600 text-sm">${material.description}</p>
+                      </div>
+                      <button class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm">
+                        Estudar
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function handleAddMaterial(e) {
+      e.preventDefault();
+      
+      if (!db.materials) db.materials = [];
+      
+      db.materials.push({
+        id: Date.now(),
+        email: currentUser.email,
+        subject: document.getElementById('material-subject').value,
+        title: document.getElementById('material-title').value,
+        description: document.getElementById('material-description').value,
+        createdAt: new Date().toISOString()
+      });
+
+      saveData();
+      document.getElementById('material-form').reset();
+      renderCurrentView();
+    }
+
+    // ==================== TASKS ====================
+    function renderTasks() {
+      const userTasks = db.tasks?.filter(t => t.email === currentUser.email).sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate)) || [];
+
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">✅ Tarefas e Prazos</h1>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Nova Tarefa</h3>
+            <form id="task-form" onsubmit="handleAddTask(event)">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Descrição</label>
+                  <input type="text" id="task-title" required placeholder="Ex: Fazer lista de exercícios"
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Data de Entrega</label>
+                  <input type="date" id="task-date" required
+                         class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Matéria</label>
+                  <select id="task-subject" class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                    <option value="">Selecionar matéria</option>
+                    ${subjects.map(s => `<option value="${s.id}">${s.icon} ${s.name}</option>`).join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Prioridade</label>
+                  <select id="task-priority" class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                    <option value="baixa">Baixa</option>
+                    <option value="média">Média</option>
+                    <option value="alta">Alta</option>
+                  </select>
+                </div>
+              </div>
+              <button type="submit" class="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-600 transition">
+                ➕ Adicionar Tarefa
+              </button>
+            </form>
+          </div>
+
+          <div class="space-y-3">
+            ${userTasks.length === 0 ? `
+              <div class="text-center py-12 bg-white rounded-2xl">
+                <p class="text-slate-500">Nenhuma tarefa pendente</p>
+              </div>
+            ` : `
+              ${userTasks.map(task => {
+                const subj = subjects.find(s => s.id === task.subject);
+                const dueDate = new Date(task.dueDate);
+                const today = new Date();
+                const isOverdue = dueDate < today && !task.completed;
+                const daysLeft = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+                
+                return `
+                  <div class="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4 ${task.completed ? 'opacity-60' : ''} ${isOverdue ? 'border-l-4 border-red-500' : 'border-l-4 border-slate-200'}">
+                    <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})" class="w-6 h-6 cursor-pointer">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2">
+                        <span class="text-lg">${subj?.icon || '📝'}</span>
+                        <h4 class="font-semibold text-slate-800 ${task.completed ? 'line-through' : ''}">${task.title}</h4>
+                        <span class="text-xs font-bold px-2 py-1 rounded-full ${
+                          task.priority === 'alta' ? 'bg-red-100 text-red-700' :
+                          task.priority === 'média' ? 'bg-amber-100 text-amber-700' :
+                          'bg-slate-100 text-slate-700'
+                        }">${task.priority}</span>
+                      </div>
+                      <p class="text-sm text-slate-500">
+                        Entrega: ${dueDate.toLocaleDateString('pt-BR')} 
+                        <span class="${isOverdue ? 'text-red-600 font-semibold' : daysLeft <= 2 ? 'text-amber-600 font-semibold' : ''}">${
+                          isOverdue ? '(Atrasada!)' : daysLeft === 0 ? '(Hoje)' : daysLeft === 1 ? '(Amanhã)' : `(${daysLeft} dias)`
+                        }</span>
+                      </p>
+                    </div>
+                    <button onclick="deleteTask(${task.id})" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
+                      🗑️
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function handleAddTask(e) {
+      e.preventDefault();
+      
+      if (!db.tasks) db.tasks = [];
+      
+      db.tasks.push({
+        id: Date.now(),
+        email: currentUser.email,
+        title: document.getElementById('task-title').value,
+        dueDate: document.getElementById('task-date').value,
+        subject: document.getElementById('task-subject').value,
+        priority: document.getElementById('task-priority').value,
+        completed: false,
+        createdAt: new Date().toISOString()
+      });
+
+      saveData();
+      document.getElementById('task-form').reset();
+      renderCurrentView();
+    }
+
+    function toggleTask(taskId) {
+      const task = db.tasks?.find(t => t.id === taskId);
+      if (task) {
+        task.completed = !task.completed;
+        saveData();
+        renderCurrentView();
+      }
+    }
+
+    function deleteTask(taskId) {
+      db.tasks = db.tasks?.filter(t => t.id !== taskId) || [];
+      saveData();
+      renderCurrentView();
+    }
+
+    // ==================== FLASHCARDS ====================
+    function renderFlashcards() {
+      const userFlashcards = db.flashcards?.filter(f => f.email === currentUser.email) || [];
+
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">🎴 Flashcards</h1>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Criar Flashcard</h3>
+            <form id="flashcard-form" onsubmit="handleAddFlashcard(event)">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Matéria</label>
+                  <select id="flashcard-subject" required class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                    ${subjects.map(s => `<option value="${s.id}">${s.icon} ${s.name}</option>`).join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Dificuldade</label>
+                  <select id="flashcard-difficulty" class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                    <option value="fácil">Fácil</option>
+                    <option value="médio">Médio</option>
+                    <option value="difícil">Difícil</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Pergunta</label>
+                <input type="text" id="flashcard-question" required placeholder="Digite a pergunta..."
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Resposta</label>
+                <textarea id="flashcard-answer" required rows="3" placeholder="Digite a resposta..."
+                          class="w-full px-4 py-3 border border-slate-200 rounded-xl resize-none"></textarea>
+              </div>
+              <button type="submit" class="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-indigo-600 transition">
+                ➕ Criar Flashcard
+              </button>
+            </form>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${userFlashcards.length === 0 ? `
+              <div class="col-span-full text-center py-12">
+                <p class="text-slate-500">Crie seus primeiros flashcards para começar a estudar</p>
+              </div>
+            ` : `
+              ${userFlashcards.map((card, idx) => {
+                const subj = subjects.find(s => s.id === card.subject);
+                return `
+                  <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition cursor-pointer group" 
+                       onclick="toggleFlashcard(this)">
+                    <div class="flex items-center justify-between mb-4">
+                      <span class="text-2xl">${subj?.icon}</span>
+                      <span class="text-xs font-bold px-2 py-1 rounded-full ${
+                        card.difficulty === 'difícil' ? 'bg-red-100 text-red-700' :
+                        card.difficulty === 'médio' ? 'bg-amber-100 text-amber-700' :
+                        'bg-green-100 text-green-700'
+                      }">${card.difficulty}</span>
+                    </div>
+                    <div class="h-32 flex flex-col justify-center">
+                      <p class="font-semibold text-slate-800 text-center group-hover:opacity-0 transition">${card.question}</p>
+                      <p class="text-sm text-slate-600 text-center opacity-0 group-hover:opacity-100 transition">${card.answer}</p>
+                    </div>
+                    <button onclick="deleteFlashcard(${card.id}, event)" class="mt-4 w-full py-2 text-red-500 text-sm hover:bg-red-50 rounded-lg transition">
+                      Deletar
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleFlashcard(element) {
+      element.style.transform = 'rotateY(180deg)';
+    }
+
+    function handleAddFlashcard(e) {
+      e.preventDefault();
+      
+      if (!db.flashcards) db.flashcards = [];
+      
+      db.flashcards.push({
+        id: Date.now(),
+        email: currentUser.email,
+        subject: document.getElementById('flashcard-subject').value,
+        difficulty: document.getElementById('flashcard-difficulty').value,
+        question: document.getElementById('flashcard-question').value,
+        answer: document.getElementById('flashcard-answer').value,
+        createdAt: new Date().toISOString()
+      });
+
+      saveData();
+      document.getElementById('flashcard-form').reset();
+      renderCurrentView();
+    }
+
+    function deleteFlashcard(cardId, event) {
+      event.stopPropagation();
+      db.flashcards = db.flashcards?.filter(f => f.id !== cardId) || [];
+      saveData();
+      renderCurrentView();
+    }
+
+    // ==================== SIMULADOS ====================
+    function renderSimulados() {
+      const results = db.simulados.filter(s => s.email === currentUser.email).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">Simulados ENEM</h1>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Escolha uma matéria</h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              ${['mat', 'por', 'his'].map(id => {
+                const subj = subjects.find(s => s.id === id);
+                return `
+                  <button onclick="startSimulado('${id}')" 
+                          class="flex flex-col items-center gap-2 p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition">
+                    <span class="text-3xl">${subj.icon}</span>
+                    <span class="font-medium text-slate-800">${subj.name}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Histórico</h3>
+            ${results.length === 0 ? `
+              <p class="text-slate-500 text-center py-8">Nenhum simulado realizado</p>
+            ` : `
+              <div class="space-y-3">
+                ${results.map(r => {
+                  const subj = subjects.find(s => s.id === r.subject);
+                  const percent = r.totalQuestions > 0 ? (r.score / r.totalQuestions) * 100 : 0;
+                  return `
+                    <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+                      <span class="text-2xl">${subj?.icon || '📝'}</span>
+                      <div class="flex-1">
+                        <h4 class="font-semibold text-slate-800">${subj?.name}</h4>
+                        <p class="text-sm text-slate-500">${new Date(r.createdAt).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-lg font-bold ${percent >= 70 ? 'text-green-600' : 'text-red-600'}">
+                          ${percent.toFixed(0)}%
+                        </p>
+                        <p class="text-xs text-slate-500">${r.score}/${r.totalQuestions}</p>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function startSimulado(subjectId) {
+      const questions = simuladoQuestions[subjectId];
+      if (!questions) return;
+
+      currentSimuladoAnswers = {};
+      simuladoTimeLeft = questions.length * 3 * 60;
+      
+      const subj = subjects.find(s => s.id === subjectId);
+      const main = document.getElementById('main-content');
+
+      function renderSimuladoContent() {
+        main.innerHTML = `
+          <div class="p-6 lg:p-8">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h1 class="text-2xl font-bold text-slate-800">Simulado de ${subj?.name}</h1>
+                <p class="text-slate-500">${questions.length} questões</p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm text-slate-500">Tempo restante</p>
+                <p id="timer" class="text-2xl font-bold text-amber-600">${formatTime(simuladoTimeLeft)}</p>
+              </div>
+            </div>
+
+            <div class="space-y-6">
+              ${questions.map((q, i) => `
+                <div class="bg-white rounded-2xl p-6 shadow-sm">
+                  <h3 class="font-bold text-slate-800 mb-4">Questão ${i + 1}</h3>
+                  <p class="text-slate-700 mb-4">${q.q}</p>
+                  <div class="space-y-2">
+                    ${q.options.map((opt, j) => `
+                      <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-slate-50 transition ${currentSimuladoAnswers[i] === j ? 'bg-amber-50 border-2 border-amber-500' : 'border-2 border-transparent'}">
+                        <input type="radio" name="q${i}" value="${j}" onchange="selectAnswer(${i}, ${j})" ${currentSimuladoAnswers[i] === j ? 'checked' : ''}
+                               class="w-5 h-5">
+                        <span class="font-medium text-slate-600">${String.fromCharCode(65 + j)})</span>
+                        <span class="text-slate-700">${opt}</span>
+                      </label>
+                    `).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <div class="mt-6 flex gap-4">
+              <button onclick="navigate('simulados')" class="px-6 py-3 bg-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-300 transition">
+                Cancelar
+              </button>
+              <button onclick="finishSimulado('${subjectId}')"
+                      class="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-600 transition">
+                Finalizar
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      renderSimuladoContent();
+
+      if (simuladoTimer) clearInterval(simuladoTimer);
+      simuladoTimer = setInterval(() => {
+        simuladoTimeLeft--;
+        const timerEl = document.getElementById('timer');
+        if (timerEl) timerEl.textContent = formatTime(simuladoTimeLeft);
+        
+        if (simuladoTimeLeft <= 0) {
+          clearInterval(simuladoTimer);
+          finishSimulado(subjectId);
+        }
+      }, 1000);
+    }
+
+    function selectAnswer(questionIndex, answerIndex) {
+      currentSimuladoAnswers[questionIndex] = answerIndex;
+    }
+
+    function finishSimulado(subjectId) {
+      if (simuladoTimer) {
+        clearInterval(simuladoTimer);
+        simuladoTimer = null;
+      }
+
+      const questions = simuladoQuestions[subjectId];
+      let score = 0;
+      questions.forEach((q, i) => {
+        if (currentSimuladoAnswers[i] === q.correct) score++;
+      });
+
+      db.simulados.push({
+        email: currentUser.email,
+        subject: subjectId,
+        score: score,
+        totalQuestions: questions.length,
+        createdAt: new Date().toISOString()
+      });
+
+      saveData();
+
+      const subj = subjects.find(s => s.id === subjectId);
+      const percent = (score / questions.length) * 100;
+
+      const main = document.getElementById('main-content');
+      main.innerHTML = `
+        <div class="p-6 lg:p-8 text-center">
+          <div class="max-w-2xl mx-auto">
+            <div class="text-6xl mb-4">${percent >= 70 ? '🎉' : percent >= 50 ? '👍' : '📚'}</div>
+            <h1 class="text-3xl font-bold text-slate-800 mb-2">Simulado Finalizado!</h1>
+
+            <div class="bg-white rounded-2xl p-8 shadow-sm mt-6 mb-6">
+              <div class="text-6xl font-bold mb-2 ${percent >= 70 ? 'text-green-600' : 'text-red-600'}">
+                ${percent.toFixed(0)}%
+              </div>
+              <p class="text-slate-600">Você acertou <strong>${score}</strong> de <strong>${questions.length}</strong> questões</p>
+            </div>
+
+            <div class="flex gap-4 justify-center">
+              <button onclick="navigate('simulados')" class="px-6 py-3 bg-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-300 transition">
+                Ver Histórico
+              </button>
+              <button onclick="startSimulado('${subjectId}')" class="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition">
+                Tentar Novamente
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==================== ESSAYS ====================
+    let essayTimer = null;
+    let essayTimeElapsed = 0;
+
+    function renderEssays() {
+      const userEssays = db.essays.filter(e => e.email === currentUser.email).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      return `
+        <div class="p-6 lg:p-8">
+          <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold text-slate-800">Redação ENEM</h1>
+            <div class="flex items-center gap-4">
+              <div class="text-right">
+                <p class="text-sm text-slate-500">Tempo de escrita</p>
+                <p id="essay-timer" class="text-2xl font-bold text-purple-600">00:00:00</p>
+              </div>
+              <button onclick="toggleEssayTimer()" id="timer-btn" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition font-semibold">
+                ▶ Iniciar
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Praticar Redação</h3>
+            <form id="essay-form" onsubmit="handleSaveEssay(event)">
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Tema</label>
+                <input type="text" id="essay-title" required placeholder="Digite o tema da redação"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Texto</label>
+                <textarea id="essay-content" required rows="15" placeholder="Escreva sua redação aqui..."
+                          class="w-full px-4 py-3 border border-slate-200 rounded-xl resize-none"></textarea>
+              </div>
+              <button type="submit" class="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition">
+                💾 Salvar Redação
+              </button>
+            </form>
+          </div>
+
+          <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Temas para Praticar</h3>
+            <div class="space-y-3 mb-6">
+              ${essayThemes.map(t => `
+                <div class="p-4 bg-slate-50 rounded-xl">
+                  <div class="flex items-center gap-4">
+                    <span class="px-3 py-1 bg-slate-200 text-slate-700 font-bold rounded-lg">${t.year}</span>
+                    <p class="flex-1 text-slate-700">${t.theme}</p>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <h3 class="text-lg font-bold text-slate-800 mb-4 mt-8">Minhas Redações</h3>
+            ${userEssays.length === 0 ? `
+              <p class="text-slate-500 text-center py-8">Nenhuma redação salva</p>
+            ` : `
+              <div class="space-y-3">
+                ${userEssays.map(essay => `
+                  <div class="p-4 bg-slate-50 rounded-xl">
+                    <h4 class="font-semibold text-slate-800">${essay.essayTitle}</h4>
+                    <p class="text-sm text-slate-500">${new Date(essay.createdAt).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function handleSaveEssay(e) {
+      e.preventDefault();
+      
+      if (essayTimer) {
+        clearInterval(essayTimer);
+        essayTimer = null;
+      }
+
+      db.essays.push({
+        email: currentUser.email,
+        essayTitle: document.getElementById('essay-title').value,
+        essayContent: document.getElementById('essay-content').value,
+        essayDate: new Date().toISOString().split('T')[0],
+        timeSpent: essayTimeElapsed,
+        createdAt: new Date().toISOString()
+      });
+
+      saveData();
+      essayTimeElapsed = 0;
+      document.getElementById('essay-form').reset();
+      renderCurrentView();
+    }
+
+    function toggleEssayTimer() {
+      const btn = document.getElementById('timer-btn');
+      
+      if (essayTimer) {
+        clearInterval(essayTimer);
+        essayTimer = null;
+        btn.textContent = '▶ Retomar';
+        btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+        btn.classList.add('bg-purple-500', 'hover:bg-purple-600');
+      } else {
+        btn.textContent = '⏸ Pausar';
+        btn.classList.remove('bg-purple-500', 'hover:bg-purple-600');
+        btn.classList.add('bg-red-500', 'hover:bg-red-600');
+        
+        essayTimer = setInterval(() => {
+          essayTimeElapsed++;
+          const timerEl = document.getElementById('essay-timer');
+          if (timerEl) {
+            timerEl.textContent = formatTime(essayTimeElapsed);
+          }
+        }, 1000);
+      }
+    }
+
+    // ==================== SETTINGS ====================
+    function renderSettings() {
+      const settings = getUserSettings();
+      
+      return `
+        <div class="p-6 lg:p-8">
+          <h1 class="text-3xl font-bold text-slate-800 mb-6">Configurações</h1>
+
+          <div class="max-w-2xl space-y-6">
+            <!-- Perfil -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 class="text-lg font-bold text-slate-800 mb-4">👤 Perfil</h3>
+              <div class="flex items-center gap-6">
+                <div class="w-20 h-20 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center text-3xl text-white font-bold">
+                  ${currentUser.name?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h4 class="text-xl font-bold text-slate-800">${currentUser.name}</h4>
+                  <p class="text-slate-500">${currentUser.email}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metas e Objetivos -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 class="text-lg font-bold text-slate-800 mb-4">🎯 Metas Diárias</h3>
+              <form id="goals-form" onsubmit="saveGoals(event)">
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Horas de Estudo/Dia</label>
+                    <input type="number" id="daily-goal" min="1" max="12" step="0.5" value="${settings.dailyGoal || 4}"
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Simulados/Mês</label>
+                    <input type="number" id="simulado-goal" min="0" max="30" value="${settings.simuladoGoal || 4}"
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Redações/Mês</label>
+                    <input type="number" id="essay-goal" min="0" max="30" value="${settings.essayGoal || 4}"
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                  </div>
+                </div>
+                <button type="submit" class="mt-4 w-full py-3 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-600 transition">
+                  💾 Salvar Metas
+                </button>
+              </form>
+            </div>
+
+            <!-- Preferências -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 class="text-lg font-bold text-slate-800 mb-4">⚙️ Preferências</h3>
+              <form id="prefs-form" onsubmit="savePreferences(event)">
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Notificações</label>
+                    <div class="flex items-center gap-3">
+                      <input type="checkbox" id="notifications" ${settings.notifications ? 'checked' : ''}
+                             class="w-5 h-5">
+                      <label for="notifications" class="text-slate-700">Ativar notificações de lembretes</label>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Tema</label>
+                    <select id="theme" class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                      <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>Claro</option>
+                      <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>Escuro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Idioma</label>
+                    <select id="language" class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                      <option value="pt-BR" ${settings.language === 'pt-BR' ? 'selected' : ''}>Português (Brasil)</option>
+                      <option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option>
+                      <option value="es" ${settings.language === 'es' ? 'selected' : ''}>Español</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" class="mt-4 w-full py-3 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition">
+                  ✓ Salvar Preferências
+                </button>
+              </form>
+            </div>
+
+            <!-- Estatísticas -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 class="text-lg font-bold text-slate-800 mb-4">📊 Estatísticas Gerais</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                  <span class="text-slate-700">Total de horas estudadas</span>
+                  <span class="font-bold text-slate-800">${getTotalStudyHours().toFixed(1)}h</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                  <span class="text-slate-700">Dias estudando</span>
+                  <span class="font-bold text-slate-800">${getStudyStreak()}</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                  <span class="text-slate-700">Simulados completados</span>
+                  <span class="font-bold text-slate-800">${db.simulados.filter(s => s.email === currentUser.email).length}</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                  <span class="text-slate-700">Redações escritas</span>
+                  <span class="font-bold text-slate-800">${db.essays.filter(e => e.email === currentUser.email).length}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Segurança -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 class="text-lg font-bold text-slate-800 mb-4">🔒 Segurança</h3>
+              <button onclick="showChangePassword()" class="w-full py-3 bg-slate-700 text-white font-semibold rounded-xl hover:bg-slate-800 transition">
+                Alterar Senha
+              </button>
+            </div>
+
+            <!-- Zona de Perigo -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-red-200">
+              <h3 class="text-lg font-bold text-red-600 mb-4">⚠️ Zona de Perigo</h3>
+              <div class="space-y-3">
+                <button onclick="showClearData()" class="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition">
+                  🗑️ Limpar Todos os Dados
+                </button>
+                <button onclick="logout()" class="w-full py-3 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition">
+                  🚪 Sair da Conta
+                </button>
+              </div>
+            </div>
+
+            <!-- Modais Ocultos -->
+            <div id="change-password-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">Alterar Senha</h3>
+                <form id="password-form" onsubmit="handleChangePassword(event)">
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Senha Atual</label>
+                    <input type="password" id="current-password" required
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                  </div>
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Nova Senha</label>
+                    <input type="password" id="new-password" required minlength="6"
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                  </div>
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Confirmar Nova Senha</label>
+                    <input type="password" id="confirm-password" required minlength="6"
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl">
+                  </div>
+                  <div id="password-error" class="hidden p-3 mb-4 bg-red-50 text-red-600 text-sm rounded-lg"></div>
+                  <div class="flex gap-3">
+                    <button type="button" onclick="closePasswordModal()" class="flex-1 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300 transition">
+                      Cancelar
+                    </button>
+                    <button type="submit" class="flex-1 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition">
+                      Atualizar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div id="clear-data-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+                <h3 class="text-xl font-bold text-red-600 mb-4">⚠️ Limpar Todos os Dados</h3>
+                <p class="text-slate-700 mb-6">Esta ação é irreversível! Todos os seus estudos, simulados e redações serão deletados.</p>
+                <div id="clear-error" class="hidden p-3 mb-4 bg-red-50 text-red-600 text-sm rounded-lg"></div>
+                <div class="flex gap-3">
+                  <button onclick="closeClearDataModal()" class="flex-1 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300 transition">
+                    Cancelar
+                  </button>
+                  <button onclick="handleClearData()" class="flex-1 py-2 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition">
+                    Deletar Tudo
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getUserSettings() {
+      const settings = localStorage.getItem(`settings_${currentUser.email}`);
+      if (settings) return JSON.parse(settings);
+      return {
+        dailyGoal: 4,
+        simuladoGoal: 4,
+        essayGoal: 4,
+        notifications: true,
+        theme: 'light',
+        language: 'pt-BR'
+      };
+    }
+
+    function getTotalStudyHours() {
+      return db.studyLogs
+        .filter(log => log.email === currentUser.email)
+        .reduce((sum, log) => sum + (log.studyHours || 0), 0);
+    }
+
+    function getStudyStreak() {
+      const logs = db.studyLogs.filter(s => s.email === currentUser.email);
+      if (logs.length === 0) return 0;
+      
+      const dates = logs.map(l => new Date(l.studyDate)).sort((a, b) => b - a);
+      let streak = 0;
+      let currentDate = new Date();
+      currentDate.setHours(0, 0, 0, 0);
+      
+      for (let date of dates) {
+        const logDate = new Date(date);
+        logDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = currentDate - logDate;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === streak) {
+          streak++;
+          currentDate = logDate;
+        } else {
+          break;
+        }
+      }
+      
+      return streak;
+    }
+
+    function saveGoals(e) {
+      e.preventDefault();
+      const settings = getUserSettings();
+      settings.dailyGoal = parseFloat(document.getElementById('daily-goal').value);
+      settings.simuladoGoal = parseInt(document.getElementById('simulado-goal').value);
+      settings.essayGoal = parseInt(document.getElementById('essay-goal').value);
+      localStorage.setItem(`settings_${currentUser.email}`, JSON.stringify(settings));
+      renderCurrentView();
+    }
+
+    function savePreferences(e) {
+      e.preventDefault();
+      const settings = getUserSettings();
+      settings.notifications = document.getElementById('notifications').checked;
+      settings.theme = document.getElementById('theme').value;
+      settings.language = document.getElementById('language').value;
+      localStorage.setItem(`settings_${currentUser.email}`, JSON.stringify(settings));
+      renderCurrentView();
+    }
+
+    function showChangePassword() {
+      document.getElementById('change-password-modal').classList.remove('hidden');
+    }
+
+    function closePasswordModal() {
+      document.getElementById('change-password-modal').classList.add('hidden');
+      document.getElementById('password-form').reset();
+    }
+
+    function handleChangePassword(e) {
+      e.preventDefault();
+      const errorEl = document.getElementById('password-error');
+      const current = document.getElementById('current-password').value;
+      const newPass = document.getElementById('new-password').value;
+      const confirm = document.getElementById('confirm-password').value;
+
+      const user = db.users.find(u => u.email === currentUser.email);
+      
+      if (!user || current !== user.password) {
+        errorEl.textContent = 'Senha atual incorreta';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      if (newPass !== confirm) {
+        errorEl.textContent = 'Senhas não conferem';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      user.password = newPass;
+      saveData();
+      closePasswordModal();
+      renderCurrentView();
+    }
+
+    function showClearData() {
+      document.getElementById('clear-data-modal').classList.remove('hidden');
+    }
+
+    function closeClearDataModal() {
+      document.getElementById('clear-data-modal').classList.add('hidden');
+    }
+
+    function handleClearData() {
+      db.studyLogs = db.studyLogs.filter(s => s.email !== currentUser.email);
+      db.simulados = db.simulados.filter(s => s.email !== currentUser.email);
+      db.essays = db.essays.filter(e => e.email !== currentUser.email);
+      saveData();
+      closeClearDataModal();
+      renderCurrentView();
+    }
+
+    // ==================== GLOBAL FUNCTIONS ====================
+    window.navigate = navigate;
+    window.logout = logout;
+    window.handleRegister = handleRegister;
+    window.handleLogin = handleLogin;
+    window.showRegister = showRegister;
+    window.showLogin = showLogin;
+    window.handleAddStudy = handleAddStudy;
+    window.handleAddMaterial = handleAddMaterial;
+    window.handleAddTask = handleAddTask;
+    window.toggleTask = toggleTask;
+    window.deleteTask = deleteTask;
+    window.handleAddFlashcard = handleAddFlashcard;
+    window.toggleFlashcard = toggleFlashcard;
+    window.deleteFlashcard = deleteFlashcard;
+    window.startSimulado = startSimulado;
+    window.selectAnswer = selectAnswer;
+    window.finishSimulado = finishSimulado;
+    window.handleSaveEssay = handleSaveEssay;
+    window.toggleEssayTimer = toggleEssayTimer;
+    window.saveGoals = saveGoals;
+    window.savePreferences = savePreferences;
+    window.showChangePassword = showChangePassword;
+    window.closePasswordModal = closePasswordModal;
+    window.handleChangePassword = handleChangePassword;
+    window.showClearData = showClearData;
+    window.closeClearDataModal = closeClearDataModal;
+    window.handleClearData = handleClearData;
+    window.getUserSettings = getUserSettings;
+    window.getTotalStudyHours = getTotalStudyHours;
+    window.getStudyStreak = getStudyStreak;
+    window.showChartTooltip = showChartTooltip;
+    window.hideChartTooltip = hideChartTooltip;
+
+    // ==================== INITIALIZATION ====================
+    loadData();
+    renderApp();
+    window.addEventListener('load', () => {
+      if (window.lucide) lucide.createIcons();
+    });
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e22215f8394280c',t:'MTc3NDQ4NTkwMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
